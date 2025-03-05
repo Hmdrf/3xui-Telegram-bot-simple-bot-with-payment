@@ -175,7 +175,7 @@ def init_db():
 # Функция авторизации в панели VPN
 def auth():
     login_url = "http://ВАШ_IP_3X_UI/login"
-    login_payload = {"username": "enegonov", "password": "1q2w3e4R!"}
+    login_payload = {"username": "ЛОГИН", "password": "ПАРОЛЬ"}
     login_headers = {'Accept': 'application/json;'}
     session = requests.Session()
     login_response = session.post(login_url, data=login_payload, headers=login_headers)
