@@ -1,0 +1,10 @@
+{
+  "api_tg": "TG_TOKEN",
+  "api_pay": "API_KEY_CRYPTOCLOUD",
+  "shop_id": "SHOP_ID_CRYPTOCLOUD",
+  "3xui_port": "PORT",
+  "3xui_ip": "IP",
+  "3xui_patch": "PATCH exmp /home/",
+  "3xui_pass": "PASSWORD",
+  "3xui_login": "LOGIN"
+}
