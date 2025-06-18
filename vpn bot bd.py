@@ -386,7 +386,7 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = float(update.message.text)  # بیایید آن را به عدد تبدیل کنیم
             await set_user_state(user_id, None)  # تنظیم مجدد وضعیت
             message = (
-                f"<b>شما مبلغ {amount} دلار وارد کردید. در حال پردازش پرداخت...</b>👋\n\n""
+                f"<b>شما مبلغ {amount} دلار وارد کردید. در حال پردازش پرداخت...</b>👋\n\n"
                 "<u>• /check</u> — بررسی <i>وضعیت پرداخت</i> 💰\n"
                 "<u>• /cancel</u> — لغو <i>پرداخت</i> ❌\n\n"
                 "⚠️ <b>توجه!</b> پس از انجام پرداخت و تأیید آن توسط درگاه، <b>حتماً</b> با استفاده از دستور /check وضعیت پرداخت را بررسی کنید! 😊"
