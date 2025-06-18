@@ -11,7 +11,7 @@ import asyncio
 import logging
 
 
-# Функция для загрузки конфигурации из JSON
+# تابعی برای بارگذاری پیکربندی از فایل JSON
 def load_config(file_path):
     with open(file_path, "r") as config_file:
         config = json.load(config_file)
@@ -28,10 +28,10 @@ xui_patch = config.get("3xui_patch")
 xui_pass = config.get("3xui_pass")
 xui_login = config.get("3xui_login")
 
-#Выставление счета
+#صدور صورت‌حساب
 async def pay(amount, user_id):
     
-# Пример данных для создания счета
+# نمونه‌ای از داده‌ها برای ایجاد صورت‌حساب
     invoice_data = {
         "amount": int(amount),
         "shop_id": shop_id,
@@ -43,18 +43,18 @@ async def pay(amount, user_id):
         }
     }
 
-    # Создание счета
+    # ایجاد صورت‌حساب
     response = sdk.create_invoice(invoice_data)
     print("Invoice Created:", response)
 
-    #Подключяемся к БД и устанавливаем пользователя в режим ожидания оплаты
+    #اتصال به پایگاه داده و قرار دادن کاربر در حالت انتظار برای پرداخت
     async with aiosqlite.connect("bot_database.db") as conn:
         cursor = await conn.cursor()
         await cursor.execute("UPDATE transactions SET status_pay = 1 WHERE user_id = ?", (user_id,))
     
-        # Получаем invoice_uuid из ответа
-        invoice_uuid = response['result']['uuid']  # Важно знать, что именно API возвращает в поле uuid
-        invoice_link = response['result']['link']  # Ссылка на оплату
+        # دریافت invoice_uuid از پاسخ
+        invoice_uuid = response['result']['uuid']  # مهم است که بدانید API دقیقاً چه چیزی را در فیلد uuid برمی‌گرداند.
+        invoice_link = response['result']['link']  # لینک پرداخت
         await cursor.execute("UPDATE transactions SET invoice_uuid = ? WHERE user_id = ?", (invoice_uuid, user_id))
 
         await cursor.execute("UPDATE transactions SET amount = ? WHERE user_id = ?", (amount, user_id))
@@ -67,37 +67,37 @@ async def clear_pay(user_id, update):
     async with aiosqlite.connect("bot_database.db") as conn:
             cursor = await conn.cursor()
             async with conn.cursor() as cursor:
-            # Читаем номер платежа
+            # خواندن شماره پرداخت
                 await cursor.execute("SELECT invoice_uuid FROM transactions WHERE user_id = ?", (user_id,))
                 result = await cursor.fetchone()
-                invoice_uuid = result[0] if result else None  # Проверяем, есть ли данные
+                invoice_uuid = result[0] if result else None  # بررسی وجود داده
             if not invoice_uuid:
-                await update.message.reply_text("Нет активного платежа для отмены.")
+                await update.message.reply_text("هیچ پرداخت فعالی برای لغو وجود ندارد.")
                 return
             response = sdk.cancel_invoice(invoice_uuid)
 
             if response.get("status") == "success":
-                # Если статус "success", проверяем результат
+                # اگر وضعیت "موفق" باشد، نتیجه را بررسی می‌کنیم
                 if response.get("result") == ["ok"]:
-                    await update.message.reply_text("Платеж успешно отменен.")
-                    # Дополнительные действия по очистке транзакции в базе данных
+                    await update.message.reply_text("پرداخت با موفقیت لغو شد.")
+                    # مراحل اضافی برای پاکسازی یک تراکنش در پایگاه داده
                     async with conn.cursor() as cursor:
                         await cursor.execute("UPDATE transactions SET invoice_uuid = 'NONE' WHERE user_id = ?", (user_id,))
                         await cursor.execute("UPDATE transactions SET status_pay = 0 WHERE user_id = ?", (user_id,))
                         await cursor.execute("UPDATE transactions SET amount = 0 WHERE user_id = ?", (user_id,))
                         await conn.commit()
                 else:
-                    # Если результат не "ok", выводим ошибку
-                    await update.message.reply_text(f"Ошибка при отмене платежа: {response.get('result')}")
+                    # اگر نتیجه "ok" نباشد، خطایی نمایش می‌دهیم.
+                    await update.message.reply_text(f"خطا در هنگام لغو پرداخت: {response.get('result')}")
             elif response.get("status") == "error":
-                # Если статус "error", выводим сообщение об ошибке
+                # اگر وضعیت "خطا" باشد، یک پیام خطا نمایش می‌دهیم.
                 error_message = response.get("result", {}).get("validate_error", "Неизвестная ошибка.")
-                await update.message.reply_text(f"Ошибка отмены: {error_message}")
+                await update.message.reply_text(f"خطای لغو: {error_message}")
             else:
-                # Если статус ответа не success и не error
-                await update.message.reply_text(f"Неизвестный статус ответа: {response}")
+                # اگر وضعیت پاسخ نه موفقیت‌آمیز باشد و نه خطا
+                await update.message.reply_text(f"وضعیت ناشناخته پاسخ: {response}")
 
-# Обработчик команды /cancel
+# /cancel کنترل کننده فرمان
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     await clear_pay(user_id, update)
@@ -105,89 +105,89 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_pay(update, user_id, amount, conn):
             cursor = await conn.cursor()
             
-            # Проверяем, есть ли запись о транзакции
+            # بررسی اینکه آیا رکوردی برای تراکنش وجود دارد
             await cursor.execute("SELECT invoice_uuid FROM transactions WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             
             if row:
                 invoice_uuid = row[0]
             else:
-                await update.message.reply_text("Ошибка: Не найдено платежное поручение для этого пользователя, обратитесь в тех поддержку.")
+                await update.message.reply_text("خطا: دستور پرداخت برای این کاربر یافت نشد، لطفا با پشتیبانی فنی تماس بگیرید.")
                 return
             try:
-                # Получаем информацию о платеже
+                # دریافت اطلاعات مربوط به پرداخت
                 response = sdk.get_invoice_info([invoice_uuid])
 
-                # Проверяем статус ответа и наличие результата
+                # ما وضعیت پاسخ و وجود نتیجه را بررسی می‌کنیم
                 if response.get("status") == "success" and "result" in response and len(response["result"]) > 0:
-                    # Получаем первый элемент из списка 'result'
+                    #اولین عنصر را از لیست «نتیجه» دریافت کن.
                     invoice_info = response["result"][0]
                         
-                    # Получаем статус счета из результата
+                    # وضعیت حساب را از نتیجه دریافت کنید
                     invoice_status = invoice_info.get("status")
                         
-                    # Печатаем статус платежа
+                    # چاپ وضعیت پرداخت
                     if invoice_status == "paid":
                         await cursor.execute("UPDATE transactions SET status_pay = 0 WHERE user_id = ?", (user_id,))
                         await cursor.execute("UPDATE transactions SET invoice_uuid = ? WHERE user_id = ?", ('NONE', user_id))
                         await cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
                         await cursor.execute("UPDATE transactions SET amount = 0 WHERE user_id = ?", (user_id,))
-                        await update.message.reply_text("Успешный платеж, проверьте баланс командой /balance")
-                        print(f"Статус счета: {invoice_status}")
+                        await update.message.reply_text("پرداخت موفقیت‌آمیز بود، با دستور /balance موجودی را بررسی کنید")
+                        print(f"وضعیت حساب: {invoice_status}")
                         await conn.commit()
                     elif invoice_status == "overpaid":
                         await cursor.execute("UPDATE transactions SET status_pay = 0 WHERE user_id = ?", (user_id,))
                         await cursor.execute("UPDATE transactions SET invoice_uuid = ? WHERE user_id = ?", ('NONE', user_id))
                         await cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
                         await cursor.execute("UPDATE transactions SET amount = 0 WHERE user_id = ?", (user_id,))
-                        await update.message.reply_text("Платеж был переплачен, проверьте баланс командой /balance")
-                        print(f"Статус счета: {invoice_status}")
+                        await update.message.reply_text("پرداخت بیش از مقدار مورد نیاز انجام شده است، با دستور /balance موجودی را بررسی کنید")
+                        print(f"وضعیت حساب: {invoice_status}")
                         await conn.commit()
                     elif invoice_status == "canceled":
                         await cursor.execute("UPDATE transactions SET status_pay = 0 WHERE user_id = ?", (user_id,))
                         await cursor.execute("UPDATE transactions SET invoice_uuid = ? WHERE user_id = ?", ('NONE', user_id))
                         await cursor.execute("UPDATE transactions SET amount = 0 WHERE user_id = ?", (user_id,))
-                        await update.message.reply_text("Платеж был отменен по истечении времени")
-                        print(f"Статус счета: {invoice_status}")
+                        await update.message.reply_text("پرداخت به دلیل پایان زمان لغو شده است")
+                        print(f"وضعیت حساب: {invoice_status}")
                         await conn.commit()
-                        print("Платеж был отменен.")
+                        print("پرداخت لغو شد.")
                     elif invoice_status == "created":
-                        await update.message.reply_text("Платеж создан, оплатите платеж до истечения времени!")
+                        await update.message.reply_text("پرداخت ایجاد شد، لطفاً قبل از اتمام زمان پرداخت را انجام دهید!")
                     else:
-                        print(f"Статус счета: {invoice_status}")
+                        print(f"وضعیت حساب: {invoice_status}")
                         print(response)
                 else:
-                    print(f"Ошибка при получении информации о платеже. Ответ: {response}")
+                    print(f"خطا در دریافت اطلاعات پرداخت. پاسخ:: {response}")
             except Exception as e:
-                print(f"Ошибка при запросе: {e}")
+                print(f"خطا در هنگام درخواست: {e}")
 
 # Обработчик команды /check
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     async with aiosqlite.connect("bot_database.db") as conn:
         async with conn.cursor() as cursor:
-            # Проверяем сумму платежа
+            # بررسی مبلغ پرداختی
             await cursor.execute("SELECT amount FROM transactions WHERE user_id = ?", (user_id,))
             result = await cursor.fetchone()
-            amount = result[0] if result else None  # Проверяем, есть ли данные
+            amount = result[0] if result else None  # بررسی وجود داده
             
-            # Проверяем статус платежа
+            # بررسی وضعیت پرداخت
             await cursor.execute("SELECT status_pay FROM transactions WHERE user_id = ?", (user_id,))
             result2 = await cursor.fetchone()
-            status_pay = result2[0] if result2 else None  # Проверяем, есть ли данные
+            status_pay = result2[0] if result2 else None  # بررسی وجود داده
    
         if status_pay == 1:
-            async with aiosqlite.connect("bot_database.db") as conn:  # Открываем новое соединение
+            async with aiosqlite.connect("bot_database.db") as conn:  # باز کردن یک اتصال جدید
                 await check_pay(update, user_id, amount, conn)
         else:
-            await update.message.reply_text("Нет созданных платежей")
+            await update.message.reply_text("هیچ پرداختی ایجاد نشده است")
         
-# Инициализация базы данных
+# مقداردهی اولیه پایگاه داده
 async def init_db():
     async with aiosqlite.connect("bot_database.db") as conn:
         cursor = await conn.cursor()
     
-        # Таблица пользователей
+        # جدول کاربران
         await cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -195,7 +195,7 @@ async def init_db():
             )
         ''')
         
-        # Таблица транзакций
+        # جدول تراکنش‌ها
         await cursor.execute('''
             CREATE TABLE IF NOT EXISTS transactions (
                 user_id INTEGER PRIMARY KEY,
@@ -206,7 +206,7 @@ async def init_db():
             )
         ''')
         
-        # Таблица VPN-аккаунтов
+        # جدول حساب‌های VPN
         await cursor.execute('''
             CREATE TABLE IF NOT EXISTS vpn_accounts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,7 +224,7 @@ async def init_db():
     async with aiosqlite.connect("user_states.db") as conn:
         cursor = await conn.cursor()
 
-        # Создаем таблицу, состояний пользователя
+        # ایجاد جدول وضعیت‌های کاربران
         await cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_states (
             user_id INTEGER PRIMARY KEY,
@@ -233,7 +233,7 @@ async def init_db():
         """)
         await conn.commit()
 
-# Функция авторизации в панели VPN
+# تابع ورود به پنل VPN
 def auth():
     login_url = f"http://{xui_ip}:{xui_port}{xui_patch}login"
     login_payload = {"username": xui_login, "password": xui_pass}
@@ -243,7 +243,7 @@ def auth():
     cookies = session.cookies.get_dict()
     return cookies if '3x-ui' in cookies else None
 
-# Функция добавления клиента
+# تابع افزودن کاربر
 def add_client(days, user_email, cookies):
     url = f"http://{xui_ip}:{xui_port}{xui_patch}panel/api/inbounds/addClient"
     expiry_time = int((datetime.datetime.now() + datetime.timedelta(days=days)).timestamp() * 1000)
@@ -266,13 +266,13 @@ def add_client(days, user_email, cookies):
     requests.post(url, headers=headers, json=payload)
     return user_uuid, expiry_time, payload
 
-# Генерация QR-кода
+# تولید کد QR
 def generate_qr(data, filename):
     qr = qrcode.make(data)
     qr.save(filename)
     return filename
 
-# Обработчик команды /start
+# کنترل‌کننده‌ی فرمان /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     async with aiosqlite.connect("bot_database.db") as conn:
@@ -280,33 +280,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
         await conn.commit()
     message = (
-        "<b>Привет!</b> 👋\n\n"
-        "Ты успешно зарегистрирован в нашем боте. "
+        "<b>سلام!</b> 👋\n\n"
+        "شما با موفقیت در بات ثبت‌نام شدید. "
         "Теперь ты можешь использовать все доступные команды:\n\n"
         "<u>• /balance</u> — Показывает твой <i>баланс</i> 💰\n"
         "<u>• /create_client</u> — Создает нового <i>клиента</i> 🧑‍💼\n"
-        "<u>• /buy</u> — Покупает товар 🛒\n"
+        "<u>• /buy</u> — خرید محصول 🛒\n"
         "<u>• /help</u> — Получить <i>помощь</i> ❓\n"
         "<u>• /cancel</u> — Отменяет <i>платеж</i> ❌\n\n"
-        "Приятного использования! 😊"
+        "استفاده لذت‌بخشی داشته باشید! 😊"
     )
     await update.message.reply_text(message, parse_mode = "HTML")
 
-# Обработчик команды /help
+# کنترل‌کننده‌ی فرمان /help
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     message = (
-        "<b>Доступные команды:</b>👋\n\n"
-        "<u>• /balance</u> — Показывает твой <i>баланс</i> 💰\n"
-        "<u>• /create_client</u> — Создает нового <i>клиента</i> 🧑‍💼\n"
-        "<u>• /buy</u> — Покупает товар 🛒\n"
-        "<u>• /help</u> — Получить <i>помощь</i> ❓\n"
-        "<u>• /cancel</u> — Отменяет <i>платеж</i> ❌\n\n"
-        "Приятного использования! 😊"
+        "<b>دستورات در دسترس:</b>👋\n\n"
+        "<u>• /balance</u> — نمایش <i>موجودی</i> 💰\n"
+        "<u>• /create_client</u> — ایجاد <i>کاربر جدید</i> 🧑‍💼\n"
+        "<u>• /buy</u> — خرید <i>محصول</i> 🛒\n"
+        "<u>• /help</u> — دریافت <i>راهنما</i> ❓\n"
+        "<u>• /cancel</u> — لغو <i>پرداخت</i> ❌\n\n"
+        "استفاده لذت‌بخشی داشته باشید! 😊"
     )
     await update.message.reply_text(message, parse_mode = "HTML")
 
-# Обработчик команды /balance
+# کنترل‌کننده‌ی فرمان /balance
 async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     async with aiosqlite.connect("bot_database.db") as conn:
@@ -317,28 +317,28 @@ async def balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
             balance = result[0]
         else:
             balance = 0
-        await update.message.reply_text(f"Твой баланс: {balance} USD.")
+        await update.message.reply_text(f"موجودی شما: {balance} USD.")
     
-#Запрос состояния пользователя из БД
+#درخواست وضعیت کاربر از پایگاه داده
 async def get_user_state(user_id):
-    """Получаем состояние пользователя из базы данных."""
+    """دریافت وضعیت کاربر از پایگاه داده."""
     async with aiosqlite.connect("user_states.db") as conn:
         cursor = await conn.cursor()
         await cursor.execute("SELECT state FROM user_states WHERE user_id = ?", (user_id,))
         result = await cursor.fetchone()
     return result[0] if result else None
 
-#Изменение состояния пользователя в БД
+#تغییر وضعیت کاربر در پایگاه داده
 async def set_user_state(user_id, state):
-    """Устанавливаем состояние пользователя в базе данных."""
+    """تنظیم وضعیت کاربر در پایگاه داده."""
     async with aiosqlite.connect("user_states.db") as conn:
         cursor = await conn.cursor()
         await cursor.execute("REPLACE INTO user_states (user_id, state) VALUES (?, ?)", (user_id, state))
         await conn.commit()
 
-# Обработчик покупки
+# پردازنده خرید
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Запрос на пополнение, если статус 0."""
+    """درخواست شارژ در صورتی که وضعیت ۰ باشد."""
     user_id = update.message.from_user.id
     async with aiosqlite.connect("bot_database.db") as conn:
         cursor = await conn.cursor()
@@ -349,55 +349,55 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await conn.commit()
 
     if result and result[0] == 0:
-        await set_user_state(user_id, "awaiting_confirmation")  # <-- УСТАНАВЛИВАЕМ ОЖИДАНИЕ "ДА"/"НЕТ"
+        await set_user_state(user_id, "awaiting_confirmation")  # <-- قرار دادن در وضعیت انتظار پاسخ بله/خیر
         keyboard = [["Да", "Нет"]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
-        await update.message.reply_text("Желаете пополнить аккаунт?", reply_markup=reply_markup)
+        await update.message.reply_text("آیا مایل به شارژ حساب هستید؟", reply_markup=reply_markup)
     else:
-        await update.message.reply_text("Ожидается выполнение платежа.")
+        await update.message.reply_text("در انتظار انجام پرداخت است.")
 
 
 async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает ответ (Да/Нет) и при 'Да' запрашивает сумму."""
+    """پاسخ (بله/خیر) را پردازش می‌کند و اگر «بله» باشد، مبلغ را می‌پرسد."""
     text = update.message.text
     user_id = update.message.from_user.id
     state = await get_user_state(user_id)
-    print(f"[handle_response] Пользователь {user_id} выбрал: {text}")  # Логируем действие
+    print(f"[handle_response] کاربر {user_id} انتخاب کرد: {text}")  # ثبت اقدامات
 
-    if state == "awaiting_confirmation":  # Проверяем, что бот ждал "Да"/"Нет"
-        if text == "Да":
-            await set_user_state(user_id, "awaiting_amount")  # Запоминаем, что ждем сумму
-            await update.message.reply_text("Введите сумму для пополнения:", reply_markup=ReplyKeyboardRemove())
-        elif text == "Нет":
-            await set_user_state(user_id, None)  # Сбрасываем состояние
-            await update.message.reply_text("Хорошо, обращайтесь, когда будете готовы.", reply_markup=ReplyKeyboardRemove())
+    if state == "awaiting_confirmation":  # بررسی کنید که ربات منتظر «بله»/«خیر» بوده است
+        if text == "بله":
+            await set_user_state(user_id, "awaiting_amount")  # به یاد داشته باشید که ما منتظر مبلغ هستیم
+            await update.message.reply_text("لطفاً مبلغ مورد نظر برای شارژ را وارد کنید:", reply_markup=ReplyKeyboardRemove())
+        elif text == "خیر":
+            await set_user_state(user_id, None)  # تنظیم مجدد وضعیت
+            await update.message.reply_text("باشه، هر وقت آماده بودید پیام دهید.", reply_markup=ReplyKeyboardRemove())
 
 async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает ввод суммы, если бот ждет ее."""
+    """ورود مبلغ را پردازش می‌کند، اگر ربات منتظر آن باشد."""
     user_id = update.message.from_user.id
-    # Получаем текущее состояние пользователя из базы данных
+    # ما وضعیت فعلی کاربر را از پایگاه داده دریافت می‌کنیم
     state = await get_user_state(user_id)
 
-    print(f"[handle_amount] Пользователь {user_id} вводит сумму, текущее состояние: {state}")  # Логируем
+    print(f"[handle_amount] کاربر {user_id} مقدار و وضعیت فعلی را وارد می‌کند: {state}")  # Логируем
 
     if state == "awaiting_amount":
         try:
-            amount = float(update.message.text)  # Преобразуем в число
-            await set_user_state(user_id, None)  # Сбрасываем состояние
+            amount = float(update.message.text)  # بیایید آن را به عدد تبدیل کنیم
+            await set_user_state(user_id, None)  # تنظیم مجدد وضعیت
             message = (
-                f"<b>Вы ввели сумму {amount} USD. Обрабатываю платеж...</b>👋\n\n"
-                "<u>• /check</u> — Проверить<i> платеж</i> 💰\n"
-                "<u>• /cancel</u> — Отменяет <i> платеж</i> ❌\n\n"
-                "ВНИМАНИЕ! После выполнения платежа и подтверждения оплаты от сервиса в окне оплаты, <b>необходимо</b> проверить платеж командой! 😊"
+                f"<b>شما مبلغ {amount} دلار وارد کردید. در حال پردازش پرداخت...</b>👋\n\n""
+                "<u>• /check</u> — بررسی <i>وضعیت پرداخت</i> 💰\n"
+                "<u>• /cancel</u> — لغو <i>پرداخت</i> ❌\n\n"
+                "⚠️ <b>توجه!</b> پس از انجام پرداخت و تأیید آن توسط درگاه، <b>حتماً</b> با استفاده از دستور /check وضعیت پرداخت را بررسی کنید! 😊"
             )
             await update.message.reply_text(message, parse_mode = "HTML")
 
-            # код для записи суммы в БД и логики оплаты
+            # کد ثبت مبلغ در پایگاه داده و منطق پرداخت
             invoice_link = await pay(amount, user_id)
-            await update.message.reply_text(f"Ваша ссылка на оплату: {invoice_link}")
+            await update.message.reply_text(f"لینک پرداخت شما: {invoice_link}")
         except ValueError:
-            await update.message.reply_text("Пожалуйста, введите корректное число.")
+            await update.message.reply_text("لطفاً یک عدد صحیح وارد کنید.")
     
 def vless_get(inbound, user_uuid, user_email, cookies):
     EXTERNAL_IP = xui_ip  
@@ -415,10 +415,10 @@ def vless_get(inbound, user_uuid, user_email, cookies):
     inbound = response.json()
 
     settings = inbound["obj"]["streamSettings"]
-    reality_settings = json.loads(settings)["realitySettings"]  # Десериализуем строку в JSON (если она строка)
+    reality_settings = json.loads(settings)["realitySettings"]  # رشته را به JSON تبدیل (deserialize) کنید (اگر رشته است)
 
     public_key = reality_settings["settings"]["publicKey"]
-    short_id = reality_settings["shortIds"][0]  # первый shortId
+    short_id = reality_settings["shortIds"][0]  # اولین shortId
     server_name = reality_settings["serverNames"][0]
 
     connection_string = (
@@ -430,7 +430,7 @@ def vless_get(inbound, user_uuid, user_email, cookies):
     print(connection_string)
     return connection_string
 
-# Обработчик создания VPN-аккаунта
+# کنترل کننده ایجاد حساب VPN
 async def create_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     async with aiosqlite.connect("bot_database.db") as conn:
@@ -442,41 +442,41 @@ async def create_client(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             balance = 0
         if balance < 1:
-            await update.message.reply_text("❌ Недостаточно средств (нужно 1 USD). Пополните баланс.")
+            await update.message.reply_text("❌ موجودی کافی نیست (معادل 200 هزار تومان نیاز دارم). موجودی خود را شارژ کنید.")
             return
         
-        # Вычитаем деньги и создаем VPN
+        # پول را کم کنید و یک VPN ایجاد کنید
         await cursor.execute("UPDATE users SET balance = balance - 1 WHERE user_id = ?", (user_id,))
         cookies = auth()
         if not cookies:
-            await update.message.reply_text("Ошибка авторизации в панели VPN.")
+            await update.message.reply_text("خطای احراز هویت در پنل VPN.")
             return
     
         user_email = f"user_{user_id}@"+str(uuid.uuid4())[:8]
         user_uuid, expiry_time, payload = add_client(30, user_email, cookies)
         
-        # Сохраняем в БД
+        # ذخیره در پایگاه داده
         await cursor.execute("INSERT INTO vpn_accounts (user_id, uuid, email, expiry_time) VALUES (?, ?, ?, ?)",
                        (user_id, user_uuid, user_email, expiry_time))
         await conn.commit()
         
-        # Генерация ссылки
+        # تولید لینک
         connection_string = vless_get(1, user_uuid, user_email, cookies)
         qr_file = generate_qr(connection_string, f"{user_id}.png")
         
-        await update.message.reply_text(f"Твой VPN создан! Подключение: {connection_string}")
-        await update.message.reply_photo(qr_file, "Твой QR-код!")
+        await update.message.reply_text(f"VPN شما ساخته شد! اطلاعات اتصال:: {connection_string}")
+        await update.message.reply_photo(qr_file, "کد QR شما!")
     
 asyncio.run(init_db())
 
-# Запуск бота
+# راه اندازی ربات
 def main():
     #logging.basicConfig(level=logging.DEBUG)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     app = Application.builder().token(tg_key).build()
     app.add_handler(CommandHandler("buy", buy))
-    app.add_handler(MessageHandler(filters.Regex("^(Да|Нет)$"), handle_response))  # Только "Да" и "Нет"
+    app.add_handler(MessageHandler(filters.Regex("^(بله|خیر)$"), handle_response))  # Только "Да" и "Нет"
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount))  # Ввод суммы
     app.add_handler(CommandHandler("help", help))
     app.add_handler(CommandHandler("start", start))
